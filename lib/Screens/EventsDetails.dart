@@ -8,9 +8,14 @@ import 'package:intl/intl.dart';
 import '../utilities/app_constant.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class EventsDetails extends StatefulWidget {
   static String routeName = './EventsDetails';
+
   const EventsDetails({Key? key}) : super(key: key);
   @override
   // ignore: library_private_types_in_public_api
@@ -67,9 +72,21 @@ class _EventsDetailsState extends State<EventsDetails> {
   }
 
   bool cancelButton = false;
+  bool isLoading = true;
+  List<dynamic> eventData = [];
+  String errorMessage = '';
   DateTime? initalDate;
   DateTime? selectedDate;
   String dateOfBirth = "MM/DD/YYYY";
+  String? firstName;
+  String? username;
+  String? email;
+  String? lastName;
+  int? active;
+  int? userId;
+  int? userTypeId;
+  List<dynamic> eventList = [];
+
   @override
   void initState() {
     super.initState();
@@ -77,11 +94,124 @@ class _EventsDetailsState extends State<EventsDetails> {
     if (selectedDate == null) {
       dateOfBirth = "MM/DD/YYYY";
     }
+    fetchMyEventData();
+    _getUserData();
+    fetchMyEventDetails();
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+  Future<void> fetchMyEventData() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
+
+    try {
+      final url = Uri.parse('https://nadaindia.in/api/web/index.php?r=event/all-my-events&dco_user_id=${userId}');
+      print('API URL: $url');
+
+      final response = await http.get(url);
+      print('Raw API Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        print('Parsed JSON Response: $jsonResponse');
+
+        if (jsonResponse['status'] == true) {
+          print('API call successful, loading event data...');
+          setState(() {
+            eventData = jsonResponse['data']['event_list'] ?? [];
+            isLoading = false;
+          });
+          print('Loaded ${eventData.length} events');
+        } else {
+          print('API returned false status: ${jsonResponse['message']}');
+          setState(() {
+            isLoading = false;
+            errorMessage = jsonResponse['message'] ?? 'Failed to load events';
+          });
+        }
+      } else {
+        print('API call failed with status code: ${response.statusCode}');
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Failed to load events: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      print('Exception occurred while fetching events: $e');
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error fetching events: $e';
+      });
+    }
+  }
+  Future<void> fetchMyEventDetails() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
+
+    try {
+      final url = Uri.parse('https://nadaindia.in/api/web/index.php?r=base/active-event-list');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+
+        if (jsonResponse['status'] == true) {
+          setState(() {
+            eventList = jsonResponse['data']['event_list'] ?? [];
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+            errorMessage = jsonResponse['message'] ?? 'Failed to load events';
+          });
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Failed to load events: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error fetching events: $e';
+      });
+    }
+  }
+
+
+  Future<void> _getUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      setState(() {
+        firstName = prefs.getString('first_name');
+        username = prefs.getString('username');
+        email = prefs.getString('email');
+        lastName = prefs.getString('last_name');
+        active = prefs.getInt('active');
+        userId = prefs.getInt('user_id');
+        userTypeId = prefs.getInt('user_type_id');
+      });
+      print('User Data Loaded:');
+      print('First Name: $firstName');
+      print('Username: $username');
+      print('Email: $email');
+      print('Last Name: $lastName');
+      print('Active: $active');
+      print('User ID: $userId');
+      print('User Type ID: $userTypeId');
+    } catch (e) {
+      print('Error accessing SharedPreferences: $e');
+    }
   }
 
   Widget build(BuildContext context) {
@@ -279,7 +409,7 @@ class _EventsDetailsState extends State<EventsDetails> {
                                 image: DecorationImage(
                                     image: AssetImage(
                                         AppImage.SelectDateCalenderImage))),
-                          ),
+                    ),
                   ),
                   Container(
                     width: MediaQuery.of(context).size.width * 90 / 100,
@@ -322,143 +452,7 @@ class _EventsDetailsState extends State<EventsDetails> {
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 1.5 / 100,
                   ),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 100 / 100,
-                    height: MediaQuery.of(context).size.height * 7 / 100,
-                    color: AppColor.greyBackgroundColor,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: MediaQuery.of(context).size.width * 94 / 100,
-                          child: Text(
-                            AppLanguage.HockeyText[language],
-                            style: const TextStyle(
-                                color: Colors.black,
-                                fontFamily: AppFont.fontFamily,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Container(
-                          width: MediaQuery.of(context).size.width * 95.5 / 100,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      child: Image.asset(
-                                        AppImage.locationIcon,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    Container(
-                                      child: Text(
-                                        AppLanguage
-                                            .NethajiIndoorStadiumText[language],
-                                        style: const TextStyle(
-                                            color: Colors.black,
-                                            fontFamily: AppFont.fontFamily,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: MediaQuery.of(context).size.width *
-                                          4 /
-                                          100,
-                                      height:
-                                          MediaQuery.of(context).size.width *
-                                              4 /
-                                              100,
-                                      child: Image.asset(
-                                        AppImage.calenderwhiteIcon,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: MediaQuery.of(context).size.width *
-                                          0.5 /
-                                          100,
-                                    ),
-                                    Container(
-                                      child: Text(
-                                        AppLanguage.EventsDateText[language],
-                                        style: const TextStyle(
-                                            color: Colors.black,
-                                            fontFamily: AppFont.fontFamily,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 2 / 100,
-                  ),
-                  Container(
-                    child: Text(AppLanguage.DecemberText[language],
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  Container(
-                    height: MediaQuery.of(context).size.width * 53 / 100,
-                    width: MediaQuery.of(context).size.width * 97 / 100,
-                    child: Image.asset(
-                      AppImage.calenderImage,
-                    ),
-                  ),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 90 / 100,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Container(
-                          height:
-                              MediaQuery.of(context).size.height * 4.5 / 100,
-                          width: MediaQuery.of(context).size.width * 46 / 100,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                              color: Color(0xffFF0000),
-                              borderRadius: BorderRadius.circular(6)),
-                          child: Text(
-                              AppLanguage.CancelAvilaibilityText[language],
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 1.1 / 100,
-                    width: MediaQuery.of(context).size.width * 38 / 100,
-                  ),
-                  Container(
-                    height: MediaQuery.of(context).size.height * 0.2 / 100,
-                    width: MediaQuery.of(context).size.width * 90 / 100,
-                    color: Color(0xffebebeb),
-                  ),
+
                   SizedBox(
                       height: MediaQuery.of(context).size.height * 2 / 100),
                 ],

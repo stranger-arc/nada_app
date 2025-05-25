@@ -7,8 +7,12 @@ import '../utilities/app_constant.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
 import 'package:http/http.dart' as http;
+import 'package:table_calendar/table_calendar.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
+
 
 class Events extends StatefulWidget {
   const Events({Key? key}) : super(key: key);
@@ -23,6 +27,23 @@ class _EventsState extends State<Events> {
   List<dynamic> eventData = [];
   bool isLoading = true;
   String errorMessage = '';
+  bool showCalendar = false;
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  Map<int, DateTime?> _fromDates = {};
+  Map<int, DateTime?> _toDates = {};
+  Map<int, DateTime> _focusedDays = {};
+  bool _isLoading = false;
+  String dateOfBirth = "MM/DD/YYYY";
+  String? firstName;
+  String? username;
+  String? email;
+  String? lastName;
+  int? active;
+  int? userId;
+  int? userTypeId;
 
   void _showAlertDialog1(BuildContext context) {
     Widget cancelButton = TextButton(
@@ -34,6 +55,8 @@ class _EventsState extends State<Events> {
         Navigator.of(context).pop();
       },
     );
+
+
 
     Widget continueButton = TextButton(
       child: Text(
@@ -67,11 +90,102 @@ class _EventsState extends State<Events> {
     );
   }
 
+  void _onDaySelected(int eventId, DateTime selectedDay, DateTime focusedDay) {
+    setState(() {
+      if (_fromDates[eventId] == null || (_fromDates[eventId] != null && _toDates[eventId] != null)) {
+        _fromDates[eventId] = selectedDay;
+        _toDates[eventId] = null;
+      } else if (_fromDates[eventId] != null && _toDates[eventId] == null) {
+        if (selectedDay.isAfter(_fromDates[eventId]!)) {
+          _toDates[eventId] = selectedDay;
+        } else {
+          _fromDates[eventId] = selectedDay;
+        }
+      }
+      _focusedDays[eventId] = focusedDay;
+    });
+  }
+
+  bool _isWithinRange(int eventId, DateTime day) {
+    if (_fromDates[eventId] != null && _toDates[eventId] != null) {
+      return day.isAfter(_fromDates[eventId]!) && day.isBefore(_toDates[eventId]!);
+    }
+    return false;
+  }
   @override
   void initState() {
     super.initState();
     fetchEventData();
+    _getUserData();
   }
+
+  Future<void> _getUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      setState(() {
+        firstName = prefs.getString('first_name');
+        username = prefs.getString('username');
+        email = prefs.getString('email');
+        lastName = prefs.getString('last_name');
+        active = prefs.getInt('active');
+        userId = prefs.getInt('user_id');
+        userTypeId = prefs.getInt('user_type_id');
+      });
+      print('User Data Loaded:');
+      print('First Name: $firstName');
+      print('Username: $username');
+      print('Email: $email');
+      print('Last Name: $lastName');
+      print('Active: $active');
+      print('User ID: $userId');
+      print('User Type ID: $userTypeId');
+    } catch (e) {
+      print('Error accessing SharedPreferences: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> markAvailability(int eventId, List<String> selectedDates) async {
+    final body = {
+      "event_id": eventId,
+      "dco_user_id": 8,
+      "marked_dates": selectedDates.map((date) => {"m_date": date}).toList(),
+    };
+    print("Request Body: ${jsonEncode(body)}");
+
+    try {
+      final response = await http.post(
+        Uri.parse("https://nadaindia.in/api/web/index.php?r=event/mark-availability"),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: jsonEncode(body),
+      );
+
+      final data = jsonDecode(response.body);
+
+      // Ensure status is strictly false or true
+      bool status = data['status'] == true;
+      String message = data['message'] ?? (status ? 'Marked successfully!' : 'Failed to mark availability.');
+
+      return {"status": status, "message": message};
+    } catch (e) {
+      return {"status": false, "message": 'Error occurred: $e'};
+    }
+  }
+
+  List<String> getDateRange(DateTime start, DateTime end) {
+    List<String> dates = [];
+    for (DateTime date = start;
+    !date.isAfter(end);
+    date = date.add(Duration(days: 1))) {
+      dates.add(DateFormat('yyyy-MM-dd').format(date));
+    }
+    return dates;
+  }
+
+
 
   Future<void> fetchEventData() async {
     setState(() {
@@ -163,12 +277,28 @@ class _EventsState extends State<Events> {
                 children: [
                   SizedBox(height: MediaQuery.of(context).size.height * 0.02),
 
-                  // Loading state
                   if (isLoading)
                     Padding(
                       padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
+                      child: Shimmer.fromColors(
+                        baseColor: Colors.grey.shade300,
+                        highlightColor: Colors.grey.shade100,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: List.generate(3, (index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: Container(
+                                width: double.infinity,
+                                height: 525,
+                                color: Colors.white,
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
                     ),
+
 
                   // Error state
                   if (errorMessage.isNotEmpty)
@@ -182,157 +312,251 @@ class _EventsState extends State<Events> {
 
                   // Event List Section
                   if (!isLoading && errorMessage.isEmpty)
-                    ...eventData.map((event) => Container(
-                      width: MediaQuery.of(context).size.width,
-                      margin: EdgeInsets.only(bottom: 16),
-                      child: Column(
-                        children: [
-                          // Upper Section: Grey Background
-                          Container(
-                            color: AppColor.greyBackgroundColor,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: MediaQuery.of(context).size.width * 0.04,
-                              vertical: 12,
-                            ),
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  width: MediaQuery.of(context).size.width * 0.92,
-                                  child: Text(
-                                    event['name'] ?? 'No event name',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: AppFont.fontFamily,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Image.asset(
-                                          AppImage.locationIcon,
-                                          width: 20,
-                                          height: 20,
-                                          color: Colors.black,
-                                        ),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          AppLanguage.NethajiIndoorStadiumText[language],
-                                          // event['location'] ?? 'No location found',
-                                          style: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Row(
-                                      children: [
-                                        Image.asset(
-                                          AppImage.calenderwhiteIcon,
-                                          width: 20,
-                                          height: 20,
-                                          color: Colors.black,
-                                        ),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          '${_formatDate(event['expected_start_datetime'])} - ${_formatDate(event['expected_end_datetime'])}',
-                                          style: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Calendar Section: White Background
-                          Container(
-                            color: Colors.white,
-                            child: Column(
-                              children: [
-                                Container(
-                                  margin: EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    _getCurrentMonth(),
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      calender1 = !calender1;
-                                    });
-                                  },
-                                  child: Container(
-                                    height: MediaQuery.of(context).size.width * 0.53,
-                                    width: MediaQuery.of(context).size.width * (calender1 ? 0.97 : 0.98),
-                                    decoration: BoxDecoration(
-                                      image: DecorationImage(
-                                        image: AssetImage(
-                                          calender1 ? AppImage.calenderImage1 : AppImage.calenderImage,
-                                        ),
-                                        fit: BoxFit.cover,
+                    ...eventData.asMap().entries.map((entry) {
+                      final index = entry.key; // Using index as unique identifier
+                      final event = entry.value;
+                      return Container(
+                        width: MediaQuery.of(context).size.width,
+                        margin: EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          children: [
+                            // Upper Section: Grey Background
+                            Container(
+                              color: AppColor.greyBackgroundColor,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: MediaQuery.of(context).size.width * 0.04,
+                                vertical: 12,
+                              ),
+                              child: Column(
+                                children: [
+                                  SizedBox(
+                                    width: MediaQuery.of(context).size.width * 0.92,
+                                    child: Text(
+                                      event['name'] ?? 'No event name',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: AppFont.fontFamily,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                ),
-                                SizedBox(height: MediaQuery.of(context).size.height * 0.003),
-                                Container(
-                                  width: MediaQuery.of(context).size.width * 0.9,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
+                                  SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      GestureDetector(
-                                        onTap: () {
-                                          if (calender1) {
-                                            _showAlertDialog1(context);
-                                          }
-                                        },
-                                        child: Container(
-                                          height: MediaQuery.of(context).size.height * 0.045,
-                                          width: MediaQuery.of(context).size.width * 0.48,
-                                          alignment: Alignment.center,
-                                          decoration: BoxDecoration(
-                                            color: AppColor.themeColor,
-                                            borderRadius: BorderRadius.circular(6),
+                                      Row(
+                                        children: [
+                                          Image.asset(
+                                            AppImage.locationIcon,
+                                            width: 20,
+                                            height: 20,
+                                            color: Colors.black,
                                           ),
-                                          child: Text(
-                                            AppLanguage.MarkAvilaibilityText[language],
+                                          SizedBox(width: 4),
+                                          Text(
+                                            event['location'] ?? 'No location found',
                                             style: TextStyle(
                                               color: Colors.black,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
-                                        ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Image.asset(
+                                            AppImage.calenderwhiteIcon,
+                                            width: 20,
+                                            height: 20,
+                                            color: Colors.black,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            '${_formatDate(event['expected_start_datetime'])} - ${_formatDate(event['expected_end_datetime'])}',
+                                            style: TextStyle(
+                                              color: Colors.black,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    )).toList(),
 
+                            // Calendar Section: White Background
+                            Container(
+                              color: Colors.white,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    margin: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      _getCurrentMonth(),
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  // Show From and To Dates
+                                  if (_fromDates[index] != null)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                      child: Text(
+                                        'From: ${DateFormat('yyyy-MM-dd').format(_fromDates[index]!)}'
+                                            '${_toDates[index] != null ? '  To: ${DateFormat('yyyy-MM-dd').format(_toDates[index]!)}' : ''}',
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                                      ),
+                                    ),
+                                  Container(
+                                    height: MediaQuery.of(context).size.width * 0.85,
+                                    width: MediaQuery.of(context).size.width * 0.98,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: TableCalendar(
+                                        firstDay: DateTime.utc(2020, 1, 1),
+                                        lastDay: DateTime.utc(2030, 12, 31),
+                                        focusedDay: _focusedDays[index] ?? DateTime.now(),
+                                        selectedDayPredicate: (day) =>
+                                        isSameDay(_fromDates[index], day) ||
+                                            isSameDay(_toDates[index], day) ||
+                                            _isWithinRange(index, day),
+                                        onDaySelected: (selectedDay, focusedDay) =>
+                                            _onDaySelected(index, selectedDay, focusedDay),
+                                        calendarStyle: CalendarStyle(
+                                          // Default text style
+                                          defaultTextStyle: TextStyle(color: Colors.black),
+                                          // Weekend text style
+                                          weekendTextStyle: TextStyle(color: Colors.black),
+                                          // Selected text style (this is what you need)
+                                          selectedTextStyle: TextStyle(
+                                            color: Colors.black, // Black text for selected dates
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          todayTextStyle: TextStyle(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          todayDecoration: BoxDecoration(
+                                            color: Colors.blueAccent,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          selectedDecoration: BoxDecoration(
+                                            color: AppColor.themeColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          rangeHighlightColor: AppColor.themeColor.withOpacity(0.3),
+                                          rangeStartDecoration: BoxDecoration(
+                                            color: AppColor.themeColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          rangeEndDecoration: BoxDecoration(
+                                            color: AppColor.themeColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          withinRangeTextStyle: TextStyle(color: Colors.black),
+                                        ),
+                                        headerStyle: HeaderStyle(
+                                          formatButtonVisible: false,
+                                          titleCentered: true,
+                                          titleTextStyle: TextStyle(color: Colors.black),
+                                        ),
+                                        availableGestures: AvailableGestures.all,
+                                        // This ensures day cells have proper contrast
+                                        daysOfWeekStyle: DaysOfWeekStyle(
+                                          weekdayStyle: TextStyle(color: Colors.black),
+                                          weekendStyle: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: MediaQuery.of(context).size.height * 0.023),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width * 0.9,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () async {
+                                            if (_fromDates[index] != null) {
+                                              DateTime from = _fromDates[index]!;
+                                              DateTime to = _toDates[index] ?? from;
+
+                                              List<String> selectedDates = getDateRange(from, to);
+                                              int eventId = eventData[index]['id'];
+
+                                              setState(() {
+                                                _isLoading = true;
+                                              });
+
+                                              final result = await markAvailability(eventId, selectedDates);
+
+                                              setState(() {
+                                                _isLoading = false;
+                                              });
+
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(result['message']),
+                                                  backgroundColor: result['status'] ? Colors.green : Colors.red,
+                                                ),
+                                              );
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Please select a date first.'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          child: Container(
+                                            height: MediaQuery.of(context).size.height * 0.045,
+                                            width: MediaQuery.of(context).size.width * 0.48,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: AppColor.themeColor,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: _isLoading
+                                                ? SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                                : Text(
+                                              AppLanguage.MarkAvilaibilityText[language],
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                      );
+                    }).toList(),
                 ],
               ),
             ),
