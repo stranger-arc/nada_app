@@ -268,8 +268,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
         ),
-        bottomNavigationBar: const BottomNav(
-            selectedMenu: MenuState.notification, notificationCount: 0),
       ),
     );
   }

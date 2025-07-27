@@ -1,5 +1,4 @@
 // Language Collection, Translation for multiple language.
-import 'package:nada_dco/Screens/CollectSampleDetails.dart';
 import 'package:flutter/cupertino.dart';
 
 class AppLanguage {
@@ -265,7 +264,7 @@ static const NameText = ["Name"];
 static const FemaleText = ["Female"];
  static const ReasonHeadingTextText = ["Reason"];
  //===============ModelText======//
- static const ExitAppText = ["Do you want to exit an App"];
+ static const ExitAppText = ["Do you want to exit the App"];
  static const ExitLogout = ["Are you sure, you want to logout?"];
  static const LogoutModelText = ["Logout?"];
  static const TicketDetailsModelText = ["Do you want to share ticket details?"];

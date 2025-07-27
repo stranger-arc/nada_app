@@ -1,462 +1,1319 @@
 import 'package:nada_dco/Screens/EventSubCategory.dart';
-import 'package:nada_dco/Screens/Success.dart';
+import 'package:nada_dco/utilities/app_apis.dart';
 import 'package:nada_dco/utilities/app_color.dart';
 import 'package:nada_dco/utilities/app_font.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../utilities/app_constant.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
 import 'package:http/http.dart' as http;
+import 'package:table_calendar/table_calendar.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 
+import '../widgets/circular_label.dart';
 
 class EventsDetails extends StatefulWidget {
   static String routeName = './EventsDetails';
 
   const EventsDetails({Key? key}) : super(key: key);
+
   @override
-  // ignore: library_private_types_in_public_api
   _EventsDetailsState createState() => _EventsDetailsState();
 }
 
 class _EventsDetailsState extends State<EventsDetails> {
-  _showAlertDialog1(BuildContext context) {
-    // set up the buttons
-    Widget cancelButton = TextButton(
-      child: Text(
-        AppLanguage.NoText[language],
-        style: TextStyle(color: Colors.red),
-      ),
-      onPressed: () {
-        Navigator.of(context).pop();
-      },
-    );
-    Widget continueButton = TextButton(
-      child: Text(
-        AppLanguage.YesText[language],
-        style: TextStyle(color: Colors.black),
-      ),
-      onPressed: () {
-        Navigator.pushNamed(
-          context,
-          SuccessScreen.routeName,
-          arguments: SuccessClass(
-            message: AppLanguage.EventDetailsSuccessText[language],
-            title: AppLanguage.SuccessText[language],
-            screenName: "eventdetailscreen",
-          ),
-        );
-      },
-    );
-    // set up the AlertDialog
-    AlertDialog alert = AlertDialog(
-      title: Text(AppLanguage.AreYouSureText[language]),
-      content: Text(
-        AppLanguage.EventDetailsModelText[language],
-      ),
-      actions: [
-        cancelButton,
-        continueButton,
-      ],
-    );
-    // show the dialog
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return alert;
-      },
-    );
-  }
-
-  bool cancelButton = false;
+  List<dynamic> availabilityDetails = [];
   bool isLoading = true;
-  List<dynamic> eventData = [];
   String errorMessage = '';
-  DateTime? initalDate;
-  DateTime? selectedDate;
-  String dateOfBirth = "MM/DD/YYYY";
-  String? firstName;
-  String? username;
-  String? email;
-  String? lastName;
-  int? active;
+  Map<int, List<DateTime>> _selectedDates = {};
+  Map<int, DateTime> _focusedDays = {};
+  Map<int, bool> _isLoadingMap = {};
   int? userId;
-  int? userTypeId;
-  List<dynamic> eventList = [];
+  Map<int, List<DateTime>> _cancelledDates = {};
 
   @override
   void initState() {
     super.initState();
-    print(selectedDate);
-    if (selectedDate == null) {
-      dateOfBirth = "MM/DD/YYYY";
-    }
-    fetchMyEventData();
-    _getUserData();
-    fetchMyEventDetails();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-  Future<void> fetchMyEventData() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = '';
-    });
-
-    try {
-      final url = Uri.parse('https://nadaindia.in/api/web/index.php?r=event/all-my-events&dco_user_id=${userId}');
-      print('API URL: $url');
-
-      final response = await http.get(url);
-      print('Raw API Response: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        print('Parsed JSON Response: $jsonResponse');
-
-        if (jsonResponse['status'] == true) {
-          print('API call successful, loading event data...');
-          setState(() {
-            eventData = jsonResponse['data']['event_list'] ?? [];
-            isLoading = false;
-          });
-          print('Loaded ${eventData.length} events');
-        } else {
-          print('API returned false status: ${jsonResponse['message']}');
-          setState(() {
-            isLoading = false;
-            errorMessage = jsonResponse['message'] ?? 'Failed to load events';
-          });
-        }
-      } else {
-        print('API call failed with status code: ${response.statusCode}');
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Failed to load events: ${response.statusCode}';
-        });
+    _getUserData().then((_) {
+      if (userId != null) {
+        fetchAvailabilityData();
       }
-    } catch (e) {
-      print('Exception occurred while fetching events: $e');
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Error fetching events: $e';
-      });
-    }
-  }
-  Future<void> fetchMyEventDetails() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = '';
     });
-
-    try {
-      final url = Uri.parse('https://nadaindia.in/api/web/index.php?r=base/active-event-list');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-
-        if (jsonResponse['status'] == true) {
-          setState(() {
-            eventList = jsonResponse['data']['event_list'] ?? [];
-            isLoading = false;
-          });
-        } else {
-          setState(() {
-            isLoading = false;
-            errorMessage = jsonResponse['message'] ?? 'Failed to load events';
-          });
-        }
-      } else {
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Failed to load events: ${response.statusCode}';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Error fetching events: $e';
-      });
-    }
   }
-
 
   Future<void> _getUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-
       setState(() {
-        firstName = prefs.getString('first_name');
-        username = prefs.getString('username');
-        email = prefs.getString('email');
-        lastName = prefs.getString('last_name');
-        active = prefs.getInt('active');
         userId = prefs.getInt('user_id');
-        userTypeId = prefs.getInt('user_type_id');
       });
-      print('User Data Loaded:');
-      print('First Name: $firstName');
-      print('Username: $username');
-      print('Email: $email');
-      print('Last Name: $lastName');
-      print('Active: $active');
-      print('User ID: $userId');
-      print('User Type ID: $userTypeId');
     } catch (e) {
       print('Error accessing SharedPreferences: $e');
     }
   }
 
+  Future<void> fetchAvailabilityData() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = '';
+    });
+    try {
+      final url = Uri.parse(
+        'https://nadaindia.in/api/web/index.php?r=event/all-my-events&dco_user_id=$userId',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (jsonResponse['status'] == true) {
+          setState(() {
+            availabilityDetails =
+                jsonResponse['data']['availability_details'] ?? [];
+            // Initialize selected dates and cancelled dates from availability data
+            _selectedDates.clear();
+            _cancelledDates.clear();
+            print(availabilityDetails);
+            for (var event in availabilityDetails) {
+              final eventId = event['event_id'];
+              _selectedDates[eventId] = [];
+              _cancelledDates[eventId] = [];
+
+              // Initially, all available dates are considered "selected" (booked)
+              for (var avail in event['dco_availability']) {
+                final date = DateTime.parse(avail['availability_date']);
+                if (avail['cancellation_status'] == '1') {
+                  _cancelledDates[eventId]!.add(date);
+                } else {
+                  _selectedDates[eventId]!.add(date);
+                }
+              }
+
+              // Ensure focusedDay is within the valid range
+              final startDate = DateTime.parse(event['event_start_date']);
+              final endDate = DateTime.parse(event['event_end_date']);
+              final now = DateTime.now();
+
+              // Set focusedDay to the first available day that's either today or after startDate
+              DateTime initialFocusedDay =
+                  now.isAfter(startDate) ? now : startDate;
+              if (initialFocusedDay.isAfter(endDate)) {
+                initialFocusedDay = endDate;
+              }
+
+              _focusedDays[eventId] = initialFocusedDay;
+            }
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+            errorMessage =
+                jsonResponse['message'] ?? 'Failed to load availability data';
+          });
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+          errorMessage =
+              'Failed to load availability data: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error fetching availability data: $e';
+      });
+    }
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return DateFormat('dd MMM yyyy').format(date);
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  Future<void> _cancelAvailability(int eventId) async {
+    setState(() {
+      _isLoadingMap[eventId] = true;
+    });
+
+    try {
+      // Here we need to cancel the dates that were originally selected but now are NOT selected
+      // (because the user tapped them to deselect)
+      final originalDates = _selectedDates[eventId] ?? [];
+      final List<DateTime> currentDates =
+          []; // Explicitly type as List<DateTime>
+
+      // Find the event matching the eventId
+      final event = availabilityDetails.firstWhere(
+        (e) => e['event_id'] == eventId,
+        orElse: () => null,
+      );
+
+      if (event != null) {
+        for (var avail in event['dco_availability']) {
+          if (avail['cancellation_status'] == '0') {
+            final date = DateTime.parse(avail['availability_date']);
+            currentDates.add(date);
+          }
+        }
+      }
+
+      // The dates to cancel are the ones that were originally selected but are no longer in _selectedDates
+      final datesToCancel =
+          currentDates
+              .where((date) => !originalDates.any((d) => isSameDay(d, date)))
+              .toList();
+      final formattedDates =
+          datesToCancel
+              .map((date) => DateFormat('yyyy-MM-dd').format(date))
+              .toList();
+
+      final url = Uri.parse(
+        'https://nadaindia.in/api/web/index.php?r=event/cancel-availability',
+      );
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          "event_id": eventId,
+          "dco_user_id": userId,
+          "cancellation_details": [
+            {"cancellation_dates": formattedDates},
+          ],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = json.decode(response.body);
+        if (jsonResponse['status'] == true) {
+          // Update the cancelled dates locally
+          setState(() {
+            _cancelledDates[eventId] ??= [];
+            _cancelledDates[eventId]!.addAll(datesToCancel);
+            // Remove the cancelled dates from selected dates
+            _selectedDates[eventId]?.removeWhere(
+              (date) => datesToCancel.any((d) => isSameDay(d, date)),
+            );
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Availability cancelled successfully')),
+          );
+          // Refresh the data
+          fetchAvailabilityData();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                jsonResponse['message'] ?? 'Failed to cancel availability',
+              ),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to cancel availability: ${response.statusCode}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error cancelling availability: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoadingMap[eventId] = false;
+      });
+    }
+  }
+
+  bool _isSelected(int eventId, DateTime day) {
+    // A date is considered selected if it's in the _selectedDates map (meaning it's still booked)
+    return _selectedDates[eventId]?.any((date) => isSameDay(date, day)) ??
+        false;
+  }
+
+  void _onDaySelected(int eventId, DateTime selectedDay, DateTime focusedDay) {
+    setState(() {
+      _focusedDays[eventId] = focusedDay;
+      _selectedDates[eventId] ??= [];
+
+      // Toggle the selection - if it was selected (booked), deselect it (mark for cancellation)
+      if (_selectedDates[eventId]!.any(
+        (date) => isSameDay(date, selectedDay),
+      )) {
+        _selectedDates[eventId]!.removeWhere(
+          (date) => isSameDay(date, selectedDay),
+        );
+      } else {
+        _selectedDates[eventId]!.add(selectedDay);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColor.background,
       appBar: AppBar(
+        backgroundColor: AppColor.background,
+        foregroundColor: AppColor.textPrimary,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
-        elevation: 1,
-        backgroundColor: Colors.white,
-        systemOverlayStyle: Constant.systemUiOverlayStyle,
-        leading: InkWell(
-            onTap: () {},
-            child: IconButton(
-              icon: Image.asset(
-                AppImage.backicon,
-                height: 25,
-                width: 25,
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => EventSubCategory()),
-                );
-              },
-            )),
-        title: Text(AppLanguage.ViewEventDetailsText[language],
-            style: Constant.appBarCenterTitleStyle),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          "Event Details",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 100 / 100,
-              color: Colors.white,
-              child: Column(
-                children: [
-                  Container(
-                    margin: EdgeInsets.symmetric(vertical: 8),
-                    width: MediaQuery.of(context).size.width * 90 / 100,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Container(
-                          width: MediaQuery.of(context).size.width * 7 / 100,
-                          height: MediaQuery.of(context).size.width * 7 / 100,
-                          child: Image.asset(
-                            AppImage.DownloadIcon,
-                          ),
+            child: Column(
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                if (isLoading)
+                  Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Shimmer.fromColors(
+                      baseColor: Colors.grey.shade300,
+                      highlightColor: Colors.grey.shade100,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: List.generate(3, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  14 + MediaQuery.of(context).size.width * 0.04,
+                                ),
+                                color: Colors.white,
+                              ),
+                              width: double.infinity,
+                              height: 525,
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+
+                if (errorMessage.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      errorMessage,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+
+                if (!isLoading && errorMessage.isEmpty)
+                  ...availabilityDetails.asMap().entries.map((entry) {
+                    final event = entry.value;
+                    final eventId = event['event_id'];
+                    final startDate = DateTime.parse(event['event_start_date']);
+                    final today = DateTime.now();
+                    final todayDate = DateTime(
+                      today.year,
+                      today.month,
+                      today.day,
+                    );
+
+                    final endDate = DateTime.parse(event['event_end_date']);
+                    final focusedDay = _focusedDays[eventId] ?? startDate;
+                    bool deploymentStatus = event['deployment_status'];
+                    final apiDeployment = event['deployment_date'];
+                    DateTime deploymentDate = startDate;
+                    if (apiDeployment == null) {
+                      deploymentDate = startDate;
+                    } else {
+                      try {
+                        // First, check if the key exists AND its value is not null or empty
+                        if (event.containsKey('deployment_date') &&
+                            event['deployment_date'] != null &&
+                            event['deployment_date'].toString().isNotEmpty) {
+                          deploymentDate = DateTime.parse(
+                            event['deployment_date'].toString(),
+                          );
+                        }
+                      } catch (e) {
+                        // If parsing fails (e.g., malformed string), checkDate remains null.
+                        // You might want to log the error for debugging:
+                        print(
+                          'Error parsing availability_deadline_datetime: $e',
+                        );
+                        deploymentDate =
+                            startDate; // Explicitly set to null on parsing error
+                      }
+                    }
+
+                    final int confirmationTime =
+                        event['disable_confirmation_in_day'];
+                    final checkDate = deploymentDate.add(
+                      Duration(days: confirmationTime),
+                    );
+                    // print('Deployment date: $deploymentDate');
+                    // print('Check date: $checkDate');
+                    // print('Today: $today');
+                    final deploymentCheck =
+                        event['dco_selectted_in_deployment'];
+                    // Ensure focusedDay is within the valid range
+                    final clampedFocusedDay =
+                        focusedDay.isBefore(startDate)
+                            ? startDate
+                            : focusedDay.isAfter(endDate)
+                            ? endDate
+                            : focusedDay;
+                    // Get the dates that are available but not selected (marked for cancellation)
+                    final availableDates =
+                        (event['dco_availability'] as List)
+                            .where(
+                              (avail) => avail['cancellation_status'] == '0',
+                            )
+                            .map(
+                              (avail) =>
+                                  DateTime.parse(avail['availability_date']),
+                            )
+                            .toList();
+
+                    final datesForCancellation =
+                        availableDates
+                            .where(
+                              (date) =>
+                                  !_selectedDates[eventId]!.any(
+                                    (d) => isSameDay(d, date),
+                                  ),
+                            )
+                            .toList();
+
+                    return Container(
+                      width: MediaQuery.of(context).size.width,
+                      margin: EdgeInsets.only(bottom: 16),
+                      color: AppColor.background,
+                      child: Padding(
+                        padding: EdgeInsets.all(
+                          MediaQuery.of(context).size.width * 0.04,
                         ),
-                        Column(
+                        child: Column(
                           children: [
                             Container(
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                      color: Colors.black,
-                                      style: BorderStyle.solid),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  14 + MediaQuery.of(context).size.width * 0.04,
                                 ),
+                                color: Color(0xFFDCEDC8),
+                                // border: Border(
+                                //   left: BoderSide(
+                                //     color: Colors.green,
+                                //     width: 3,
+                                //   ),
+                                // ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    // More prominent light shadow
+                                    // A very bright, almost white-green for a stronger highlight
+                                    color: Color.fromARGB(255, 250, 255, 250),
+                                    offset: Offset(-6, -6),
+                                    // Slightly larger offset
+                                    blurRadius: 15,
+                                    // Increased blur for a softer, wider pop
+                                    spreadRadius: 0,
+                                  ),
+                                  BoxShadow(
+                                    // More prominent dark shadow
+                                    // A darker, more distinct muted green for deeper contrast
+                                    color: Color.fromARGB(255, 170, 180, 170),
+                                    offset: Offset(6, 6),
+                                    // Slightly larger offset
+                                    blurRadius: 15,
+                                    // Increased blur for a softer, wider pop
+                                    spreadRadius: 0,
+                                  ),
+                                ],
                               ),
-                              margin: EdgeInsets.only(left: 1),
-                              child: Text(
-                                AppLanguage.DeploymentApprovelText[language],
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  // decoration: TextDecoration.underline
+                              child: Padding(
+                                padding: EdgeInsets.all(
+                                  MediaQuery.of(context).size.width * 0.04,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Column(
+                                      children: [
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.only(
+                                              topLeft: Radius.circular(14),
+                                              topRight: Radius.circular(14),
+                                            ),
+                                            color: Color(0xFF296948),
+                                            //border: Border.all(color: Colors.green,width: 2),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(5.0),
+                                            child: Column(
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Image.asset(
+                                                      AppImage.locationIcon,
+                                                      width: 25,
+                                                      height: 25,
+                                                      color: Colors.white,
+                                                    ),
+
+                                                    Text(
+                                                      '${event['location']} (${event['state']})',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          9,
+                                                        ),
+                                                    color: Color(0xFFF1F8E9),
+                                                  ),
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          3.0,
+                                                        ),
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            Image.asset(
+                                                              AppImage
+                                                                  .calenderwhiteIcon,
+                                                              width: 25,
+                                                              height: 25,
+                                                              color: Color(
+                                                                0xFF296948,
+                                                              ),
+                                                            ),
+
+                                                            Text(
+                                                              '${_formatDate(event['event_start_date'])} - ${_formatDate(event['event_end_date'])}',
+                                                              style: TextStyle(
+                                                                color: Color(
+                                                                  0xFF296948,
+                                                                ),
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                            Padding(
+                                                              padding:
+                                                                  EdgeInsets.all(
+                                                                    8,
+                                                                  ),
+                                                              child:
+                                                                  (deploymentStatus ==
+                                                                          false)
+                                                                      ? (todayDate.isAfter(
+                                                                            startDate,
+                                                                          ))
+                                                                          ? CircularLabel(
+                                                                            //for event passed
+                                                                            color:
+                                                                                AppColor.error,
+                                                                            radius:
+                                                                                8.0,
+                                                                          )
+                                                                          : CircularLabel(
+                                                                            //for deployment true
+                                                                            color:
+                                                                                AppColor.success,
+                                                                            radius:
+                                                                                8.0,
+                                                                          )
+                                                                      : CircularLabel(
+                                                                        //for event open
+                                                                        color:
+                                                                            AppColor.warning,
+                                                                        radius:
+                                                                            8.0,
+                                                                      ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        if (checkDate.isBefore(
+                                                          today,
+                                                        ))
+                                                          Text(
+                                                            'Confirmation time has passed',
+                                                            style: TextStyle(
+                                                              color: Colors.red,
+                                                              fontSize: 12,
+                                                              // fontWeight:
+                                                              // FontWeight
+                                                              //     .bold,
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.only(
+                                          bottomLeft: Radius.circular(14),
+                                          bottomRight: Radius.circular(14),
+                                        ),
+                                        color: Color(0xFFF1F8E9),
+                                        //border: Border.all(color: Color(0xFF296948)),
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(height: 8),
+                                          if (datesForCancellation.isNotEmpty)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4.0,
+                                                  ),
+                                              child: Text(
+                                                'For Cancellation: ${datesForCancellation.map((date) => DateFormat('MMM dd').format(date)).join(', ')}',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          SizedBox(
+                                            //height: MediaQuery.of(context).size.width * 0.85,
+                                            width:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).size.width *
+                                                0.98,
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child: TableCalendar(
+                                                firstDay: startDate,
+                                                lastDay: endDate,
+                                                focusedDay: clampedFocusedDay,
+                                                selectedDayPredicate:
+                                                    (day) => _isSelected(
+                                                      eventId,
+                                                      day,
+                                                    ),
+                                                onDaySelected:
+                                                    (selectedDay, focusedDay) =>
+                                                        _onDaySelected(
+                                                          eventId,
+                                                          selectedDay,
+                                                          focusedDay,
+                                                        ),
+                                                enabledDayPredicate: (day) {
+                                                  final isAvailable =
+                                                      event['dco_availability'].any((
+                                                        avail,
+                                                      ) {
+                                                        final availDate =
+                                                            DateTime.parse(
+                                                              avail['availability_date'],
+                                                            );
+                                                        return isSameDay(
+                                                              availDate,
+                                                              day,
+                                                            ) &&
+                                                            avail['cancellation_status'] ==
+                                                                "0";
+                                                      });
+                                                  return isAvailable;
+                                                },
+                                                calendarStyle: CalendarStyle(
+                                                  defaultTextStyle: TextStyle(
+                                                    color: Colors.black,
+                                                  ),
+                                                  weekendTextStyle: TextStyle(
+                                                    color: Colors.black,
+                                                  ),
+                                                  selectedTextStyle: TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  todayTextStyle: TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  todayDecoration:
+                                                      BoxDecoration(
+                                                        color:
+                                                            Colors.blueAccent,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  selectedDecoration: BoxDecoration(
+                                                    color: Colors.green
+                                                        .withOpacity(0.3),
+                                                    // Increased opacity for better visibility
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  withinRangeTextStyle:
+                                                      TextStyle(
+                                                        color: Colors.black,
+                                                      ),
+                                                  disabledTextStyle: TextStyle(
+                                                    color: Colors.grey,
+                                                  ),
+                                                  defaultDecoration:
+                                                      BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  outsideDecoration:
+                                                      BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  weekendDecoration:
+                                                      BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                ),
+                                                headerStyle: HeaderStyle(
+                                                  formatButtonVisible: false,
+                                                  titleCentered: true,
+                                                  titleTextStyle: TextStyle(
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                                availableGestures:
+                                                    AvailableGestures
+                                                        .horizontalSwipe,
+                                                daysOfWeekStyle:
+                                                    DaysOfWeekStyle(
+                                                      weekdayStyle: TextStyle(
+                                                        color: Colors.black,
+                                                      ),
+                                                      weekendStyle: TextStyle(
+                                                        color: Colors.black,
+                                                      ),
+                                                    ),
+                                                calendarBuilders: CalendarBuilders(
+                                                  defaultBuilder: (
+                                                    context,
+                                                    day,
+                                                    focusedDay,
+                                                  ) {
+                                                    final isToday = isSameDay(
+                                                      day,
+                                                      DateTime.now(),
+                                                    );
+                                                    final isAvailable =
+                                                        event['dco_availability'].any((
+                                                          avail,
+                                                        ) {
+                                                          final availDate =
+                                                              DateTime.parse(
+                                                                avail['availability_date'],
+                                                              );
+                                                          return isSameDay(
+                                                                availDate,
+                                                                day,
+                                                              ) &&
+                                                              avail['cancellation_status'] ==
+                                                                  "0";
+                                                        });
+                                                    final isSelected =
+                                                        _selectedDates[eventId]
+                                                            ?.any(
+                                                              (d) => isSameDay(
+                                                                d,
+                                                                day,
+                                                              ),
+                                                            ) ??
+                                                        false;
+                                                    final isCancelled =
+                                                        event['dco_availability'].any((
+                                                          avail,
+                                                        ) {
+                                                          final availDate =
+                                                              DateTime.parse(
+                                                                avail['availability_date'],
+                                                              );
+                                                          return isSameDay(
+                                                                availDate,
+                                                                day,
+                                                              ) &&
+                                                              avail['cancellation_status'] ==
+                                                                  "1";
+                                                        });
+
+                                                    if (isCancelled) {
+                                                      return Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Container(
+                                                            width: 32,
+                                                            height: 32,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .withOpacity(
+                                                                        0.3,
+                                                                      ),
+                                                                  shape:
+                                                                      BoxShape
+                                                                          .circle,
+                                                                ),
+                                                            child: Center(
+                                                              child: Text(
+                                                                '${day.day}',
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      Colors
+                                                                          .black,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 2),
+                                                          Text(
+                                                            'Cancelled',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors
+                                                                      .red[800],
+                                                              fontSize: 8,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    } else if (isAvailable) {
+                                                      // Handle selected dates (green) - priority over today
+                                                      if (isSelected) {
+                                                        return Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            Container(
+                                                              width: 32,
+                                                              height: 32,
+                                                              decoration: BoxDecoration(
+                                                                color: Colors
+                                                                    .green
+                                                                    .withOpacity(
+                                                                      0.3,
+                                                                    ),
+                                                                shape:
+                                                                    BoxShape
+                                                                        .circle,
+                                                              ),
+                                                              child: Center(
+                                                                child: Text(
+                                                                  '${day.day}',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        Colors
+                                                                            .black,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            SizedBox(height: 2),
+                                                            Text(
+                                                              'Booked',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .green[800],
+                                                                fontSize: 8,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      }
+                                                      // Handle today's date (blue)
+                                                      else if (isToday) {
+                                                        return Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            Container(
+                                                              width: 32,
+                                                              height: 32,
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    Colors
+                                                                        .blueAccent,
+                                                                shape:
+                                                                    BoxShape
+                                                                        .circle,
+                                                              ),
+                                                              child: Center(
+                                                                child: Text(
+                                                                  '${day.day}',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        Colors
+                                                                            .black,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            SizedBox(height: 2),
+                                                            Text(
+                                                              'Today',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors
+                                                                        .blue[800],
+                                                                fontSize: 8,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      }
+                                                      // Regular available dates
+                                                      else {
+                                                        return Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            Container(
+                                                              width: 32,
+                                                              height: 32,
+                                                              decoration: BoxDecoration(
+                                                                color: AppColor
+                                                                    .themeColor
+                                                                    .withOpacity(
+                                                                      0.3,
+                                                                    ),
+                                                                shape:
+                                                                    BoxShape
+                                                                        .circle,
+                                                                border: Border.all(
+                                                                  color:
+                                                                      AppColor
+                                                                          .themeColor,
+                                                                  width: 2,
+                                                                ),
+                                                              ),
+                                                              child: Center(
+                                                                child: Text(
+                                                                  '${day.day}',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        Colors
+                                                                            .black,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            SizedBox(height: 2),
+                                                            Text(
+                                                              'For Cancel',
+                                                              style: TextStyle(
+                                                                color:
+                                                                    AppColor
+                                                                        .themeColor,
+                                                                fontSize: 8,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      }
+                                                    }
+
+                                                    // For all other dates (not in API response)
+                                                    return Center(
+                                                      child: Container(
+                                                        width: 32,
+                                                        height: 32,
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              isToday
+                                                                  ? Colors
+                                                                      .blueAccent
+                                                                  : null,
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            '${day.day}',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  isToday
+                                                                      ? Colors
+                                                                          .black
+                                                                      : Colors
+                                                                          .grey,
+                                                              fontWeight:
+                                                                  isToday
+                                                                      ? FontWeight
+                                                                          .bold
+                                                                      : FontWeight
+                                                                          .normal,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  disabledBuilder: (
+                                                    context,
+                                                    day,
+                                                    focusedDay,
+                                                  ) {
+                                                    final isToday = isSameDay(
+                                                      day,
+                                                      DateTime.now(),
+                                                    );
+                                                    final isCancelled =
+                                                        event['dco_availability'].any((
+                                                          avail,
+                                                        ) {
+                                                          final availDate =
+                                                              DateTime.parse(
+                                                                avail['availability_date'],
+                                                              );
+                                                          return isSameDay(
+                                                                availDate,
+                                                                day,
+                                                              ) &&
+                                                              avail['cancellation_status'] ==
+                                                                  "1";
+                                                        });
+
+                                                    if (isCancelled) {
+                                                      return Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Container(
+                                                            width: 32,
+                                                            height: 32,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .withOpacity(
+                                                                        0.3,
+                                                                      ),
+                                                                  shape:
+                                                                      BoxShape
+                                                                          .circle,
+                                                                ),
+                                                            child: Center(
+                                                              child: Text(
+                                                                '${day.day}',
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      Colors
+                                                                          .black,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 2),
+                                                          Text(
+                                                            'Cancelled',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors
+                                                                      .red[800],
+                                                              fontSize: 8,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    }
+                                                    return Center(
+                                                      child: Container(
+                                                        width: 32,
+                                                        height: 32,
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              isToday
+                                                                  ? Colors
+                                                                      .lightBlueAccent
+                                                                      .withOpacity(
+                                                                        0.2,
+                                                                      )
+                                                                  : null,
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                        child: Center(
+                                                          child: Text(
+                                                            '${day.day}',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  isToday
+                                                                      ? Colors
+                                                                          .black
+                                                                      : Colors
+                                                                          .grey,
+                                                              fontWeight:
+                                                                  isToday
+                                                                      ? FontWeight
+                                                                          .bold
+                                                                      : FontWeight
+                                                                          .normal,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.end,
+                                              children: [
+                                                // Show cancel button only if there are dates marked for cancellation
+                                                if (datesForCancellation
+                                                        .isNotEmpty &&
+                                                    (deploymentStatus ==
+                                                        false) &&
+                                                    todayDate.isBefore(
+                                                      startDate,
+                                                    ))
+                                                  GestureDetector(
+                                                    onTap: () async {
+                                                      await _cancelAvailability(
+                                                        eventId,
+                                                      );
+                                                    },
+                                                    child: Container(
+                                                      height:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.height *
+                                                          0.045,
+                                                      width:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width *
+                                                          0.48,
+                                                      alignment:
+                                                          Alignment.center,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
+                                                      child:
+                                                          (_isLoadingMap[eventId] ??
+                                                                  false)
+                                                              ? SizedBox(
+                                                                height: 20,
+                                                                width: 20,
+                                                                child: CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                  color:
+                                                                      Colors
+                                                                          .white,
+                                                                ),
+                                                              )
+                                                              : Text(
+                                                                AppLanguage
+                                                                    .CancelAvilaibilityText[language],
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      Colors
+                                                                          .white,
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                              ),
+                                                    ),
+                                                  ),
+                                                if ((deploymentStatus ==
+                                                        true) &&
+                                                    (deploymentCheck == true))
+                                                  (checkDate.isAfter(today) ||
+                                                          checkDate
+                                                              .isAtSameMomentAs(
+                                                                today,
+                                                              ))
+                                                      ? GestureDetector(
+                                                        onTap: () async {
+                                                          await AppApis.confirmDeployment(
+                                                            context: context,
+                                                            dcoUserId: userId,
+                                                            eventId: eventId,
+                                                          );
+                                                        },
+                                                        child: Container(
+                                                          height:
+                                                              MediaQuery.of(
+                                                                context,
+                                                              ).size.height *
+                                                              0.045,
+                                                          width:
+                                                              MediaQuery.of(
+                                                                context,
+                                                              ).size.width *
+                                                              0.48,
+                                                          alignment:
+                                                              Alignment.center,
+                                                          decoration: BoxDecoration(
+                                                            color: Color(
+                                                              0xFF9CCC65,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  6,
+                                                                ),
+                                                          ),
+                                                          child:
+                                                              (_isLoadingMap[eventId] ??
+                                                                      false)
+                                                                  ? SizedBox(
+                                                                    height: 20,
+                                                                    width: 20,
+                                                                    child: CircularProgressIndicator(
+                                                                      strokeWidth:
+                                                                          2,
+                                                                      color:
+                                                                          Colors
+                                                                              .white,
+                                                                    ),
+                                                                  )
+                                                                  : Text(
+                                                                    'Confirm',
+                                                                    style: TextStyle(
+                                                                      color:
+                                                                          Colors
+                                                                              .white,
+                                                                      fontSize:
+                                                                          15,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                    ),
+                                                                  ),
+                                                        ),
+                                                      )
+                                                      : Container(
+                                                        height:
+                                                            MediaQuery.of(
+                                                              context,
+                                                            ).size.height *
+                                                            0.045,
+                                                        width:
+                                                            MediaQuery.of(
+                                                              context,
+                                                            ).size.width *
+                                                            0.48,
+                                                        alignment:
+                                                            Alignment.center,
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              Colors
+                                                                  .grey
+                                                                  .shade200,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                6,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          'Confirm',
+                                                          style: TextStyle(
+                                                            color: Colors.grey,
+                                                            fontSize: 15,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 100 / 100,
-                    height: MediaQuery.of(context).size.height * 7 / 100,
-                    color: AppColor.greyBackgroundColor,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: MediaQuery.of(context).size.width * 94 / 100,
-                          child: Text(
-                            AppLanguage.TableTennisText[language],
-                            style: const TextStyle(
-                                color: Colors.black,
-                                fontFamily: AppFont.fontFamily,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Container(
-                          width: MediaQuery.of(context).size.width * 95.5 / 100,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      child: Image.asset(
-                                        AppImage.locationIcon,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    Container(
-                                      child: Text(
-                                        AppLanguage
-                                            .NethajiIndoorStadiumText[language],
-                                        style: const TextStyle(
-                                            color: Colors.black,
-                                            fontFamily: AppFont.fontFamily,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: MediaQuery.of(context).size.width *
-                                          4 /
-                                          100,
-                                      height:
-                                          MediaQuery.of(context).size.width *
-                                              4 /
-                                              100,
-                                      child: Image.asset(
-                                        AppImage.calenderwhiteIcon,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: MediaQuery.of(context).size.width *
-                                          0.5 /
-                                          100,
-                                    ),
-                                    Container(
-                                      child: Text(
-                                        AppLanguage.EventsDateText[language],
-                                        style: const TextStyle(
-                                            color: Colors.black,
-                                            fontFamily: AppFont.fontFamily,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 2 / 100,
-                  ),
-                  Container(
-                    child: Text(AppLanguage.NovemberText[language],
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      cancelButton = !cancelButton;
-                      setState(() {});
-                    },
-                    child: cancelButton
-                        ? Container(
-                            height:
-                                MediaQuery.of(context).size.width * 53 / 100,
-                            width: MediaQuery.of(context).size.width * 98 / 100,
-                            decoration: BoxDecoration(
-                                image: DecorationImage(
-                                    image: AssetImage(
-                              AppImage.updatDateCalenderImage,
-                            ))),
-                          )
-                        : Container(
-                            height:
-                                MediaQuery.of(context).size.width * 53 / 100,
-                            width: MediaQuery.of(context).size.width * 99 / 100,
-                            decoration: BoxDecoration(
-                                image: DecorationImage(
-                                    image: AssetImage(
-                                        AppImage.SelectDateCalenderImage))),
-                    ),
-                  ),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 90 / 100,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            if (cancelButton == false) {
-                              _showAlertDialog1(context);
-                            }
-                          },
-                          child: Container(
-                            height:
-                                MediaQuery.of(context).size.height * 4.5 / 100,
-                            width: MediaQuery.of(context).size.width * 46 / 100,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                                color: Color(0xffFF0000),
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(
-                                AppLanguage.CancelAvilaibilityText[language],
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 1.2 / 100,
-                  ),
-                  Container(
-                    height: MediaQuery.of(context).size.height * 0.2 / 100,
-                    width: MediaQuery.of(context).size.width * 90 / 100,
-                    color: Color(0xffebebeb),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 1.5 / 100,
-                  ),
-
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 2 / 100),
-                ],
-              ),
+                      ),
+                    );
+                  }).toList(),
+              ],
             ),
           ),
         ),

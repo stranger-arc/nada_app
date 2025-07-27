@@ -1,4 +1,4 @@
-import 'package:nada_dco/Screens/Aboutus.dart';
+import 'package:nada_dco/Screens/AboutUs.dart';
 import 'package:nada_dco/Screens/ChangePassword.dart';
 import 'package:nada_dco/Screens/Contactus.dart';
 import 'package:nada_dco/Screens/DeleteAccount.dart';
@@ -81,10 +81,7 @@ class _SettingsState extends State<Settings> {
                 width: 25,
               ),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const Profile()),
-                );
+                Navigator.of(context).pop();
               },
             )),
         title: Text(AppLanguage.SettingsText[language],

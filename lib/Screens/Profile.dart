@@ -1,371 +1,492 @@
+import 'package:flutter/material.dart';
 import 'package:nada_dco/Screens/EditProfile.dart';
-import 'package:nada_dco/Screens/Home.dart';
 import 'package:nada_dco/Screens/Settings.dart';
 import 'package:nada_dco/common/bottom_nav.dart';
-import 'package:nada_dco/utilities/app_constant.dart';
-import 'package:nada_dco/utilities/app_language.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../utilities/app_image.dart';
+import 'package:nada_dco/models/user_profile.dart'; // Your UserProfile model
+import 'package:nada_dco/services/user_api_service.dart'; // Your UserApiService
+import 'package:nada_dco/utilities/app_color.dart';
+import 'package:nada_dco/widgets/profile_shimmer_loader.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nada_dco/utilities/app_constant.dart';
+
+import '../utilities/app_language.dart';
+import 'Login.dart'; // <-- ADD THIS LINE
 
 class Profile extends StatefulWidget {
-  const Profile({Key? key}) : super(key: key);
+  final String? userId;
+
+  const Profile({Key? key, this.userId}) : super(key: key);
+
   @override
   _ProfileState createState() => _ProfileState();
 }
 
 class _ProfileState extends State<Profile> {
-  String email = '';
-  String fname = '';
-  String lname = '';
-  String uname = '';
-  String about = '';
+  // --- ALL YOUR EXISTING LOGIC AND STATE VARIABLES ARE PRESERVED ---
+  late Future<UserProfile>? _userProfileFuture;
+  final UserApiService _apiService = UserApiService();
 
   @override
   void initState() {
     super.initState();
-    _getUserData();
+    _initializeProfile();
   }
 
-  Future<void> _getUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+  _showAlertDialog1(BuildContext context) {
+    // set up the buttons
+    Widget cancelButton = TextButton(
+      child: Text(
+        AppLanguage.NoText[language],
+        style: TextStyle(color: Colors.red),
+      ),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+    Widget continueButton = TextButton(
+      child: Text(
+        AppLanguage.YesText[language],
+        style: TextStyle(color: Colors.black),
+      ),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => Login(title: '')),
+        );
+      },
+    );
+    // set up the AlertDialog
+    AlertDialog alert = AlertDialog(
+      title: Text(AppLanguage.LogoutModelText[language]),
+      content: Text(AppLanguage.ExitLogout[language]),
+      actions: [cancelButton, continueButton],
+    );
+    // show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
+    );
+  }
+
+  Future<void> _showLogoutConfirmationDialog(BuildContext context) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // User must tap a button to close
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[Text('Are you sure you want to logout?')],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Logout'),
+              onPressed: () async {
+                Navigator.of(context).pop(); // Close the dialog
+                await _performLogout(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performLogout(BuildContext context) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Login(title: 'Logout Successfull'),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Logout error: ${e.toString()}')));
+    }
+  }
+
+  Future<void> _initializeProfile() async {
+    String? finalUserId = widget.userId;
+
+    // If no ID was passed from a parent widget, try to get it from storage.
+    if (finalUserId == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final loadedId = prefs.getInt('user_id');
+      finalUserId = loadedId?.toString();
+    }
+
+    // Now, set the future for the FutureBuilder.
     setState(() {
-      email = prefs.getString('email') ?? 'No email found';
-      fname = prefs.getString('first_name') ?? 'No email found';
-      lname = prefs.getString('last_name') ?? 'No email found';
-      uname = prefs.getString('username') ?? 'No email found';
-      about = prefs.getString('about') ?? 'No email found';
+      if (finalUserId != null && finalUserId.isNotEmpty) {
+        // If we have a valid ID, call the API.
+        _userProfileFuture = _apiService.fetchUserProfile(finalUserId!);
+      } else {
+        // If there's no ID, create a future that returns an error.
+        _userProfileFuture = Future.error(
+          "User ID not found. Please log in again.",
+        );
+      }
     });
   }
 
+  // --- ONLY THE BUILD METHOD AND UI HELPERS ARE UPDATED ---
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () {
-        return Future.value(true);
-      },
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Container(
+    return Scaffold(
+      backgroundColor: AppColor.background,
+      appBar: AppBar(
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        // Make the AppBar itself transparent
+        backgroundColor: Colors.transparent,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        // Removes default back button
+        title: const Text(
+          "Profile",
+          style: TextStyle(
+            color: AppColor.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        //can be implemented later
+        // actions: [
+        //   IconButton(
+        //     onPressed:
+        //         () => Navigator.push(
+        //           context,
+        //           MaterialPageRoute(builder: (context) => Settings(title: "")),
+        //         ),
+        //     icon: const Icon(
+        //       Icons.settings_outlined,
+        //       color: AppColor.textSecondary,
+        //     ),
+        //   ),
+        //   IconButton(
+        //     onPressed:
+        //         () => Navigator.push(
+        //           context,
+        //           MaterialPageRoute(builder: (context) => const EditProfile()),
+        //         ),
+        //     icon: const Icon(
+        //       Icons.edit_outlined,
+        //       color: AppColor.textSecondary,
+        //     ),
+        //   ),
+        // ],
+      ),
+      body: FutureBuilder<UserProfile>(
+        future: _userProfileFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // You can use your existing shimmer loader
+            return const ProfileShimmerLoader();
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 50,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Failed to load profile: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColor.accent,
+                      ),
+                      onPressed: () => _initializeProfile,
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(color: AppColor.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          if (snapshot.hasData) {
+            final user = snapshot.data!;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 100.0),
               child: Column(
                 children: [
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        // padding: EdgeInsets.only(bottom:11),
-                        width: MediaQuery.of(context).size.width * 100 / 100,
-                        height: MediaQuery.of(context).size.width * 88 / 100,
-                        decoration: const BoxDecoration(
-                          //  color:Colors.red,
-                          image: DecorationImage(
-                            image: AssetImage(AppImage.myProfilebackgroundImage),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 3 / 100,
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 25 / 100,
-                                ),
-                                Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 50 / 100,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    AppLanguage.ProfileText[language],
-                                    style: const TextStyle(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 20),
-                                  ),
-                                ),
-                                Container(
-                                  width:
-                                      MediaQuery.of(context).size.width * 25 / 100,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) => Settings(
-                                                      title: "",
-                                                    )),
-                                          );
-                                        },
-                                        child: Container(
-                                          width: MediaQuery.of(context).size.width *
-                                              9 /
-                                              100,
-                                          height:
-                                              MediaQuery.of(context).size.width *
-                                                  9 /
-                                                  100,
-                                          child: Image.asset(
-                                              AppImage.settingWhiteIcon,
-                                              color: Colors.black,),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const EditProfile()),
-                                          );
-                                        },
-                                        child: Container(
-                                          width: MediaQuery.of(context).size.width *
-                                              9 /
-                                              100,
-                                          height:
-                                              MediaQuery.of(context).size.width *
-                                                  9 /
-                                                  100,
-                                          child:
-                                              Image.asset(AppImage.editWhiteIcon,
-                                               color: Colors.black,),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 16.5 / 100,
-                            ),
-                           
-                          ],
-                        ),
+                  CircleAvatar(
+                    radius: 54,
+                    backgroundColor: AppColor.accent,
+                    child: Text(
+                      user.name.isNotEmpty ? user.name.substring(0, 1) : '?',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColor.textOnAccent,
+                        fontSize: 40,
                       ),
-                   Positioned(
-                    bottom: -1,
-                      // bottom: MediaQuery.of(context).size.width*0/100,
-                     child: Column(
-                       children: [
-                         Container(
-                                    width: MediaQuery.of(context).size.width * 41 / 100,
-                                    height: MediaQuery.of(context).size.width * 41 / 100,
-                                    decoration: BoxDecoration(
-                                      border:
-                                          Border.all(width: 5.2, color: Color(0xfffaf7f7)),
-                                      borderRadius:
-                                          BorderRadius.circular(100), //<-- SEE HERE
-                   
-                                      image: const DecorationImage(
-                                        image: AssetImage(AppImage.UserProfileImage),
-                                      ),
-                                    ),
-                                  ),
-                                   SizedBox(
-                      height: MediaQuery.of(context).size.height * 1 / 100),
-                                    Container(
-                   
-                    child: Text(
-                      
-                      fname + " " + lname,
-                      style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 22),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    user.name.isEmpty ? "Not Available" : user.name,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColor.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Chip(
+                    backgroundColor: AppColor.accent.withOpacity(0.5),
+                    // Chip color
+                    shape: StadiumBorder(
+                      side: BorderSide(color: AppColor.accent.withOpacity(0.5)),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    label: Text(
+                      'Unique Id: ${user.uniqueId}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColor.border,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
 
-                  ),
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.2 / 100),
-                  Container(
-                    child: Text(
-                      email,
-                      style: const TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 18),
-                    ),
-                  ),
-                       ],
-                     ),
-                   ),
+                  // --- Organized Information Cards ---
+                  _buildInfoCard(
+                    title: "Personal Details",
+                    children: [
+                      _buildInfoRow(
+                        icon: Icons.person,
+                        label: "Gender",
+                        value: user.gender.isEmpty ? "Not Available" : user.gender,
+                      ),
+                      _buildInfoRow(
+                        icon: Icons.cake,
+                        label: "DOB",
+                        value: user.dob.isEmpty ? "Not Available" : user.dob,
+                      ),
                     ],
                   ),
-                
-                  
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 2 / 100),
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                    ),
-                    width: double.infinity,
-                    // height: ,
-                    // color: Colors.red,
-                    child: Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                      margin: EdgeInsets.symmetric(vertical: 12),
-                      width: MediaQuery.of(context).size.width * 95 / 100,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 2,
-                            blurRadius: 7,
-                            offset: Offset(0, 1), // changes position of shadow
-                          ),
-                        ],
+                  const SizedBox(height: 16),
+                  _buildInfoCard(
+                    title: "Contact Details",
+                    children: [
+                      _buildInfoRow(
+                        icon: Icons.smartphone,
+                        label: "Primary Mobile No.",
+                        value:
+                            user.primaryMobileNo.isEmpty
+                                ? "Not Available"
+                                : user.primaryMobileNo,
                       ),
-                      // color: Colors.amberAccent,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Profilecard(
-                              title1: AppLanguage.GenderText[language],
-                              title2: AppLanguage.MaleText[language]),
-                          Profilecard(
-                              title1: AppLanguage.DOBText[language],
-                              title2: "02/22/1998"),
-                          Profilecard(
-                              title1:
-                                  AppLanguage.PrimaryMobileNumberText[language],
-                              title2: "+91 7856784596"),
-                          Profilecard(
-                              title1:
-                                  AppLanguage.SecondaryMobileNoText[language],
-                              title2: "+91 7856784596"),
-                          Profilecard(
-                              title1: AppLanguage.AddressText[language],
-                              title2:
-                                  "Mandir 1752-B, behind Ranjeet Hanuman Road, Maruti App.Opp.Ranjeet"),
-                          Profilecard(
-                              title1:
-                                  AppLanguage.PermanentAddressText[language],
-                              title2:
-                                  "289, Prakhar Deep, Scheme, 97, Gopur Square, Indore, Madhya Pradesh 452009"),
-                          Profilecard(
-                              title1: AppLanguage.StateText[language],
-                              title2: AppLanguage.MadhyaPradeshText[language]),
-                          Profilecard(
-                              title1: AppLanguage.CityText[language],
-                              title2: AppLanguage.IndoreText[language]),
-                          Profilecard(
-                              title1: AppLanguage.LocationText[language],
-                              title2:
-                                  "PV74+GPV, Pandrinath Path, Gautampura, indore, Madhya Pradesh 452007"),
-                          SizedBox(
-                            height:
-                                MediaQuery.of(context).size.height * 0.6 / 100,
-                          ),
-                          Container(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              AppLanguage.EmployeeTypeText[language],
-                              style: const TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 17),
-                            ),
-                          ),
-                          SizedBox(
-                            height:
-                                MediaQuery.of(context).size.height * 0.6 / 100,
-                          ),
-                          Container(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              AppLanguage.ParttimeEmployeeText[language],
-                              style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 16),
-                            ),
-                          ),
-                          SizedBox(
-                            height:
-                                MediaQuery.of(context).size.height * 1.5 / 100,
-                          ),
-                        ],
+                      _buildInfoRow(
+                        icon: Icons.phone,
+                        label: "Secondary Mobile No.",
+                        value: user.secondaryMobileNo ?? "Not Available",
                       ),
-                    ),
+                      _buildInfoRow(
+                        icon: Icons.email,
+                        label: "Email",
+                        value: user.email ?? "Not Available",
+                      ),
+                      _buildInfoRow(
+                        icon: Icons.home_work,
+                        label: "Address",
+                        value: user.address.isEmpty ? "Not Available" : user.address,
+                      ),
+                      _buildInfoRow(
+                        icon: Icons.location_on,
+                        label: "Permanent Address",
+                        value: user.permanentAddress ?? "Not Available",
+                      ),
+                    ],
                   ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 4 / 100,
+                  const SizedBox(height: 16),
+                  _buildInfoCard(
+                    title: "Professional Details",
+                    children: [
+                      _buildInfoRow(
+                        icon: Icons.map,
+                        label: "State",
+                        value: user.state.isEmpty ? "Not Available" : user.state,
+                      ),
+                      _buildInfoRow(
+                        icon: Icons.location_city,
+                        label: "City",
+                        value: user.city.isEmpty ? "Not Available" : user.city,
+                      ),
+                      _buildInfoRow(
+                        icon: Icons.badge,
+                        label: "Designation",
+                        value:
+                            user.designation.isEmpty ? "Not Available" : user.designation,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // --- Dedicated Actions Card ---
+                  _buildActionCard(
+                    icon: Icons.logout,
+                    title: "Log Out",
+                    onTap: () {
+                      _showLogoutConfirmationDialog(context);
+                    },
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-        bottomNavigationBar: const BottomNav(
-            selectedMenu: MenuState.profile, notificationCount: 0),
+            );
+          }
+          return const Center(child: Text('No user data available.'));
+        },
       ),
     );
   }
-}
 
-class Profilecard extends StatelessWidget {
-  Profilecard({
-    Key? key,
-    required this.title1,
-    required this.title2,
-  }) : super(key: key);
-  final String title1;
-  final String title2;
+  // --- NEW UI HELPER WIDGETS ---
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6 / 100,
-        ),
-        Container(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            title1.toString(),
-            style: const TextStyle(
-                color: Colors.black, fontWeight: FontWeight.w500, fontSize: 17),
+  Widget _buildInfoCard({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20.0),
+        color: AppColor.card,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6 / 100,
-        ),
-        Container(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            title2.toString(),
-            style: const TextStyle(
-                color: Colors.grey, fontWeight: FontWeight.w400, fontSize: 16),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColor.textPrimary,
+              ),
+            ),
           ),
+          const Divider(height: 24),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColor.accent, size: 24), // The new icon
+          const SizedBox(width: 12),
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.3,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColor.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              softWrap: true,
+              value,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: AppColor.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20.0),
+      splashColor: Colors.red.withOpacity(0.1),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.0),
+          color: AppColor.card,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 1.5 / 100,
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.red, size: 24),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+            const Spacer(),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+          ],
         ),
-        Container(
-          width: MediaQuery.of(context).size.width * 84 / 100,
-          height: MediaQuery.of(context).size.height * 0.3 / 100,
-          color: Color(0xffefefef),
-        ),
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.5 / 100,
-        ),
-      ],
+      ),
     );
   }
 }

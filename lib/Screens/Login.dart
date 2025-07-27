@@ -1,5 +1,5 @@
+import 'package:nada_dco/MainScreen.dart';
 import 'package:nada_dco/Screens/ForgotPassword.dart';
-import 'package:nada_dco/Screens/Home.dart';
 import 'package:nada_dco/utilities/app_color.dart';
 import 'package:nada_dco/utilities/app_constant.dart';
 import 'package:nada_dco/utilities/app_font.dart';
@@ -98,19 +98,27 @@ class _LoginState extends State<Login> {
         await AppApis.storeUserData(data['data']['user']);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful'),
+            SnackBar(
+            content: Text(response['data']['message'] ?? 'Login successful, Welcome to NADA'),
             backgroundColor: Colors.green,
           ),
         );
 
         Future.delayed(const Duration(seconds: 1), () {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Home()));
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainScreen()));
         });
+      } else if (response['data']['message'] == 'Inactive Account') {
+        // User is inactive
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+            content: Text(response['data']['message'] ?? 'Your account is inactive. Please contact support.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['message'] ?? 'Login failed'),
+            content: Text(response['data']['message'] ?? 'Wrong Credentials, please try with correct password'),
             backgroundColor: Colors.red,
           ),
         );
@@ -130,9 +138,6 @@ class _LoginState extends State<Login> {
   }
 
 
-
-
-
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -146,7 +151,7 @@ class _LoginState extends State<Login> {
           backgroundColor: AppColor.primaryColor,
           body: SingleChildScrollView(
             child: Center(
-              child: Container(
+              child: SizedBox(
                   width: MediaQuery.of(context).size.width * 100 / 100,
                   height: MediaQuery.of(context).size.height * 100 / 100,
                   child: Column(
@@ -160,7 +165,7 @@ class _LoginState extends State<Login> {
                                   2.1 /
                                   100,
                             ),
-                            Container(
+                            SizedBox(
                               width:
                                   MediaQuery.of(context).size.width * 62 / 100,
                               height:
@@ -184,11 +189,20 @@ class _LoginState extends State<Login> {
                                   borderRadius: BorderRadius.circular(8),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      spreadRadius: 3,
-                                      blurRadius: 7,
-                                      offset: Offset(
-                                          0, 1), // changes position of shadow
+                                      // More prominent light shadow
+                                      // A very bright, almost white-green for a stronger highlight
+                                      color: Color.fromARGB(255, 250, 255, 250),
+                                      offset: Offset(-6, -6), // Slightly larger offset
+                                      blurRadius: 15,        // Increased blur for a softer, wider pop
+                                      spreadRadius: 0,
+                                    ),
+                                    BoxShadow(
+                                      // More prominent dark shadow
+                                      // A darker, more distinct muted green for deeper contrast
+                                      color: Color.fromARGB(255, 170, 180, 170),
+                                      offset: Offset(6, 6),   // Slightly larger offset
+                                      blurRadius: 15,        // Increased blur for a softer, wider pop
+                                      spreadRadius: 0,
                                     ),
                                   ],
                                 ),
@@ -199,7 +213,7 @@ class _LoginState extends State<Login> {
                                             MediaQuery.of(context).size.height *
                                                 4 /
                                                 100),
-                                    Container(
+                                    SizedBox(
                                       width: MediaQuery.of(context).size.width *
                                           70 /
                                           100,
@@ -223,10 +237,6 @@ class _LoginState extends State<Login> {
                                             MediaQuery.of(context).size.width *
                                                 70 /
                                                 100,
-                                        height:
-                                            MediaQuery.of(context).size.height *
-                                                6 /
-                                                100,
                                         decoration: BoxDecoration(
                                           color: AppColor.primaryColor,
                                           borderRadius: BorderRadius.all(
@@ -243,7 +253,7 @@ class _LoginState extends State<Login> {
                                                       2 /
                                                       100,
                                                 ),
-                                                Container(
+                                                SizedBox(
                                                   width: MediaQuery.of(context)
                                                           .size
                                                           .width *
@@ -330,10 +340,6 @@ class _LoginState extends State<Login> {
                                             MediaQuery.of(context).size.width *
                                                 70 /
                                                 100,
-                                        height:
-                                            MediaQuery.of(context).size.height *
-                                                6 /
-                                                100,
                                         color: AppColor.primaryColor,
                                         child: Column(
                                           children: [
@@ -346,7 +352,7 @@ class _LoginState extends State<Login> {
                                                       2 /
                                                       100,
                                                 ),
-                                                Container(
+                                                SizedBox(
                                                   width: MediaQuery.of(context)
                                                           .size
                                                           .width *
@@ -360,7 +366,7 @@ class _LoginState extends State<Login> {
                                                   child: Image.asset(
                                                       AppImage.LockIcon),
                                                 ),
-                                                Container(
+                                                SizedBox(
                                                   width: MediaQuery.of(context)
                                                           .size
                                                           .width *

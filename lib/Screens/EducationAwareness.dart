@@ -4,6 +4,7 @@ import 'package:nada_dco/utilities/app_color.dart';
 import 'package:nada_dco/utilities/app_constant.dart';
 import 'package:nada_dco/utilities/app_language.dart';
 import 'package:flutter/material.dart';
+import '../MainScreen.dart';
 import '../utilities/app_image.dart';
 
 class EducationAwareness extends StatefulWidget {
@@ -37,9 +38,11 @@ class _EducationAwarenessState extends State<EducationAwareness> {
                 width: 25,
               ),
               onPressed: () {
-                Navigator.push(
+                Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => Home()),
+                  MaterialPageRoute(builder: (context) => const MainScreen()),
+                  // This (route) => false predicate removes all previous routes.
+                      (route) => false,
                 );
               },
             )),

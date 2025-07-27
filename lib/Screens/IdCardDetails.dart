@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:nada_dco/Screens/Home.dart';
 import 'package:nada_dco/utilities/app_constant.dart';
 import 'package:flutter/material.dart';
+import '../MainScreen.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
 
@@ -33,10 +34,12 @@ class _IdCardDetailsState extends State<IdCardDetails> {
                 width: 25,
               ),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => Home()),
-                );
+                Navigator.pushAndRemoveUntil(
+  context,
+  MaterialPageRoute(builder: (context) => const MainScreen()),
+  // This (route) => false predicate removes all previous routes.
+  (route) => false,
+);
               },
             )),
         title: Text(AppLanguage.IDCardText[language],

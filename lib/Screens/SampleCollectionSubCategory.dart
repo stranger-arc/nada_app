@@ -1,12 +1,15 @@
 import 'package:nada_dco/Screens/Home.dart';
 import 'package:nada_dco/utilities/app_color.dart';
 import 'package:nada_dco/utilities/app_constant.dart';
-import 'package:nada_dco/utilities/app_font.dart';
+import 'package:nada_dco/utilities/app_font.dart'; // Keep if Constant.appBarCenterTitleStyle is used
 import 'package:flutter/material.dart';
+import '../MainScreen.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
 import 'CollectSampleDetails.dart';
 import 'ViewCollectSampleDetail.dart';
+import 'package:nada_dco/utilities/page_transitions.dart'; // Added for custom transitions
+import 'package:nada_dco/widgets/sub_cat_card.dart'; // Added for ListItemCard
 
 class SampleCollectionSubCategory extends StatefulWidget {
   static String routeName = './SampleCollectionSubCategory';
@@ -21,180 +24,75 @@ class __SampleCollectionSubCategoryStateState
     extends State<SampleCollectionSubCategory> {
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+    // Assuming 'language' is accessible, e.g., from AppConstant
+    final int language = 0; // Placeholder: Replace with actual language variable/logic
+
+    return GestureDetector( // Keep GestureDetector for unfocus logic if needed
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          centerTitle: true,
-          elevation: 1,
-          backgroundColor: Colors.white,
-          systemOverlayStyle: Constant.systemUiOverlayStyle,
-          leading: InkWell(
-              onTap: () {},
-              child: IconButton(
-                icon: Image.asset(
-                  AppImage.backicon,
-                  height: 25,
-                  width: 25,
-                ),
+        backgroundColor: AppColor.background, // Match EventSubCategory
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              backgroundColor: AppColor.background, // Match EventSubCategory
+              pinned: true,
+              floating: true,
+              expandedHeight: 150.0, // Match EventSubCategory
+              surfaceTintColor: Colors.transparent, // Match EventSubCategory
+
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back, color: AppColor.textPrimary), // Match EventSubCategory
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => Home()),
-                  );
+                  Navigator.of(context).pop();
                 },
-              )),
-          title: Text(AppLanguage.SampleCollectionText[language],
-              style: Constant.appBarCenterTitleStyle),
-        ),
-        body: SafeArea(
-          child: Container(
-            width: MediaQuery.of(context).size.width * 100 / 100,
-            height: MediaQuery.of(context).size.height * 100 / 100,
-            color: Colors.white,
-            child: Column(
-              children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 7 / 100),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(context, CollectSampleDetails.routeName);
-                  },
-                child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 3,
-                              blurRadius: 7,
-                              offset: Offset(0, 1), // changes position of shadow
-                            ),
-                          ],
-                        ),
-                        alignment: Alignment.centerRight,
-                        width: MediaQuery.of(context).size.width * 90 / 100,
-                        height: MediaQuery.of(context).size.height * 14 / 100,
-                        child: RotatedBox(
-                          quarterTurns: 1,
-                          child: Text(
-                            'Container 1',
-                            style: TextStyle(fontSize: 18.0, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: -41,
-                        
-                        width: MediaQuery.of(context).size.width * 90 / 100,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Center(
-                              child: Image.asset(
-                                AppImage.collectedSampleIcon,
-                                width: MediaQuery.of(context).size.width *
-                                    24 /
-                                    100,
-                                height: MediaQuery.of(context).size.width *
-                                    24 /
-                                    100,
-                              ),
-                            ),
-                            SizedBox(
-                              height:
-                                  MediaQuery.of(context).size.height * 0.5 / 100,
-                            ),
-                            Container(
-                              child: Text(
-                                AppLanguage.CollectSampleText[language],
-                               style: Constant.homeTextStyle
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: const EdgeInsets.all(10), // Match EventSubCategory
+                title: Text(
+                  AppLanguage.SampleCollectionText[language], // Use relevant text
+                  style: TextStyle(
+                    fontSize: 28.0,
+                    fontWeight: FontWeight.bold,
+                    color: AppColor.textPrimary, // Match EventSubCategory
                   ),
-              
-               ),
-                SizedBox(height: MediaQuery.of(context).size.height * 8 / 100),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pushNamed(
-                        context, ViewCollectSampleDetail.routeName);
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 3,
-                              blurRadius: 7,
-                              offset: Offset(0, 1), // changes position of shadow
-                            ),
-                          ],
-                        ),
-                        alignment: Alignment.centerRight,
-                        width: MediaQuery.of(context).size.width * 90 / 100,
-                        height: MediaQuery.of(context).size.height * 14 / 100,
-                        child: RotatedBox(
-                          quarterTurns: 1,
-                          child: Text(
-                            'Container 1',
-                            style: TextStyle(fontSize: 18.0, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: -41,
-                        // right: 30,
-                        //  bottom: 60,
-                        // top: 5,
-                        width: MediaQuery.of(context).size.width * 90 / 100,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Center(
-                              child: Image.asset(
-                                AppImage.descollectedIcon,
-                                width: MediaQuery.of(context).size.width *
-                                    24 /
-                                    100,
-                                height: MediaQuery.of(context).size.width *
-                                    24 /
-                                    100,
-                              ),
-                            ),
-                            SizedBox(
-                              height:
-                                  MediaQuery.of(context).size.height * 0.5 / 100,
-                            ),
-                            Container(
-                              child: Text(
-                                AppLanguage.ViewCollectedSamplesDetailText[language],
-                               style: Constant.homeTextStyle
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-              
                 ),
-              ],
+                centerTitle: true, // Match EventSubCategory
+              ),
             ),
-          ),
+            SliverToBoxAdapter(
+              child: Container(
+                width: MediaQuery.of(context).size.width, // Simplified 100/100
+                height: MediaQuery.of(context).size.height - (MediaQuery.of(context).padding.top + kToolbarHeight),
+                color: AppColor.background, // Match EventSubCategory
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0), // Match EventSubCategory
+                  child: Column(
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.08), // Match EventSubCategory (8/100)
+                      ListItemCard(
+                        icon: Icons.medication_liquid, // Use Image.asset as iconWidget
+                        title: AppLanguage.CollectSampleText[language], // Use relevant text
+                        subtitle: 'Collect new samples for analysis', // Add a descriptive subtitle
+                        onTap: () {
+                          Navigator.pushNamed(context, CollectSampleDetails.routeName);
+                        },
+                      ),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.08), // Match EventSubCategory
+                      ListItemCard(
+                        icon: Icons.file_copy, // Use Image.asset as iconWidget
+                        title: AppLanguage.ViewCollectedSamplesDetailText[language], // Use relevant text
+                        subtitle: 'View details of previously collected samples', // Add a descriptive subtitle
+                        onTap: () {
+                          Navigator.pushNamed(context, ViewCollectSampleDetail.routeName);
+                        },
+                      ),
+                      // Add more SizedBox or cards if needed to make it scrollable
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

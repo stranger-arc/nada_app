@@ -3,10 +3,13 @@ import 'package:nada_dco/Screens/TravelDetails.dart';
 import 'package:nada_dco/Screens/TravelPlans.dart';
 import 'package:nada_dco/utilities/app_color.dart';
 import 'package:nada_dco/utilities/app_constant.dart';
-import 'package:nada_dco/utilities/app_font.dart';
+import 'package:nada_dco/utilities/app_font.dart'; // Keep if Constant.homeTextStyle is used
 import 'package:flutter/material.dart';
+import '../MainScreen.dart';
 import '../utilities/app_image.dart';
 import '../utilities/app_language.dart';
+import 'package:nada_dco/utilities/page_transitions.dart'; // Added for custom transitions
+import 'package:nada_dco/widgets/sub_cat_card.dart'; // Added for ListItemCard
 
 class TravelSubCategory extends StatefulWidget {
   static String routeName = './TravelSubCategory';
@@ -17,189 +20,76 @@ class TravelSubCategory extends StatefulWidget {
 }
 
 class _TravelSubCategoryState extends State<TravelSubCategory> {
-   
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        centerTitle: true,
-        elevation: 1,
-        backgroundColor: Colors.white,
-        leading: InkWell(
-            onTap: () {},
-            child: IconButton(
-              icon: Image.asset(
-                AppImage.backicon,
-                height: 25,
-                width: 25,
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => Home(
+    // Assuming 'language' is accessible, e.g., from AppConstant
+    final int language = 0; // Placeholder: Replace with actual language variable/logic
 
-                          )),
-                );
+    return Scaffold(
+      backgroundColor: AppColor.background, // Match EventSubCategory
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: AppColor.background, // Match EventSubCategory
+            pinned: true,
+            floating: true,
+            expandedHeight: 150.0, // Match EventSubCategory
+            surfaceTintColor: Colors.transparent, // Match EventSubCategory
+
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: AppColor.textPrimary), // Match EventSubCategory
+              onPressed: () {
+                Navigator.of(context).pop();
               },
-            )),
-        title: Text(
-          AppLanguage.TravelPlanText[language],
-          style: const TextStyle(
-            fontSize: 20,
-            color: Colors.black,
-            fontWeight: FontWeight.w700,
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.all(10), // Match EventSubCategory
+              title: Text(
+                AppLanguage.TravelPlanText[language], // Use relevant text
+                style: TextStyle(
+                  fontSize: 28.0,
+                  fontWeight: FontWeight.bold,
+                  color: AppColor.textPrimary, // Match EventSubCategory
+                ),
+              ),
+              centerTitle: true, // Match EventSubCategory
+            ),
           ),
-        ),
-      ),
-      body: SafeArea(
-        child: Container(
-          width: MediaQuery.of(context).size.width * 100 / 100,
-          height: MediaQuery.of(context).size.height * 100 / 100,
-          color: Colors.white,
-          child: Column(
-            children: [
-              SizedBox(height: MediaQuery.of(context).size.height * 7 / 100),
-              GestureDetector(
-                onTap: () {
-                   Navigator.pushNamed(context,TravelPlans.routeName);
-                  
-                },
-               child: Stack(
-                  clipBehavior: Clip.none,
+          SliverToBoxAdapter(
+            child: Container(
+              width: MediaQuery.of(context).size.width, // Simplified 100/100
+              // Set height to fill remaining space, allowing scroll if content overflows
+              height: MediaQuery.of(context).size.height - (MediaQuery.of(context).padding.top + kToolbarHeight),
+              color: AppColor.background, // Match EventSubCategory
+              child: Padding(
+                padding: const EdgeInsets.all(10.0), // Match EventSubCategory
+                child: Column(
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 3,
-                            blurRadius: 7,
-                            offset: Offset(0, 1), // changes position of shadow
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.centerRight,
-                      width: MediaQuery.of(context).size.width * 90 / 100,
-                      height: MediaQuery.of(context).size.height * 14 / 100,
-                      child: RotatedBox(
-                        quarterTurns: 1,
-                        child: Text(
-                          'Container 1',
-                          style: TextStyle(fontSize: 18.0, color: Colors.white),
-                        ),
-                      ),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.08), // Match EventSubCategory (8/100)
+                    ListItemCard(
+                      icon: Icons.share, // Use Image.asset as iconWidget
+                      title: AppLanguage.ShareTicketDetailsText[language], // Use relevant text
+                      subtitle: 'Share your travel ticket details', // Add a descriptive subtitle
+                      onTap: () {
+                        Navigator.pushNamed(context, TravelPlans.routeName);
+                      },
                     ),
-                    Positioned(
-                      top: -34,
-                      
-                      width: MediaQuery.of(context).size.width * 90 / 100,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Center(
-                            child: Image.asset(
-                              AppImage.shareIcon,
-                          
-                              width: MediaQuery.of(context).size.width *
-                                  24 /
-                                  100,
-                              height: MediaQuery.of(context).size.width *
-                                  24 /
-                                  100,
-                            ),
-                          ),
-                          SizedBox(
-                            height:
-                                MediaQuery.of(context).size.height * 0.5 / 100,
-                          ),
-                          Container(
-                            child: Text(
-                              AppLanguage.ShareTicketDetailsText[language],
-                              style: Constant.homeTextStyle
-                            ),
-                          ),
-                        ],
-                      ),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.08), // Match EventSubCategory
+                    ListItemCard(
+                      icon: Icons.airplane_ticket, // Use Image.asset as iconWidget
+                      title: AppLanguage.ViewTicketDetailsText[language], // Use relevant text
+                      subtitle: 'View and manage your booked travel details', // Add a descriptive subtitle
+                      onTap: () {
+                        Navigator.pushNamed(context, TravelDetails.routeName);
+                      },
                     ),
+                    // Add more SizedBox or cards if needed to make it scrollable
                   ],
                 ),
-               
               ),
-              SizedBox(height: MediaQuery.of(context).size.height * 8 / 100),
-              GestureDetector(
-                onTap: () {
-                   Navigator.pushNamed(context,TravelDetails.routeName);
-                },
-               child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 3,
-                            blurRadius: 7,
-                            offset: Offset(0, 1), // changes position of shadow
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.centerRight,
-                      width: MediaQuery.of(context).size.width * 90 / 100,
-                      height: MediaQuery.of(context).size.height * 14 / 100,
-                      child: RotatedBox(
-                        quarterTurns: 1,
-                        child: Text(
-                          'Container 1',
-                          style: TextStyle(fontSize: 18.0, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: -41,
-                     
-                      width: MediaQuery.of(context).size.width * 90 / 100,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Center(
-                            child: Image.asset(
-                              AppImage.desIcon,
-                            
-                              width: MediaQuery.of(context).size.width *
-                                  24 /
-                                  100,
-                              height: MediaQuery.of(context).size.width *
-                                  24 /
-                                  100,
-                            ),
-                          ),
-                          SizedBox(
-                            height:
-                                MediaQuery.of(context).size.height * 0.5 / 100,
-                          ),
-                          Container(
-                            child: Text(
-                              AppLanguage.ViewTicketDetailsText[language],
-                             style: Constant.homeTextStyle
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-             
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
