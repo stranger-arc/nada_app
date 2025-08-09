@@ -165,11 +165,11 @@ class _MarkAttendanceState extends State<MarkAttendance> {
                               AssetImage(AppImage.markAttendeceCalenderImage))),
                 ),
                 DottedBorder(
-                  borderType: BorderType.RRect,
-                  radius: Radius.circular(14),
-                  dashPattern: [12, 12],
-                  strokeWidth: 5,
-                  color: Color(0xffEFEFEF),
+                  options: RoundedRectDottedBorderOptions(
+                    radius: Radius.circular(14),
+                    dashPattern: [12, 12],
+                    strokeWidth: 5,
+                    color: Color(0xffEFEFEF),),
                   child: Container(
                     width: MediaQuery.of(context).size.width * 89 / 100,
                     height: MediaQuery.of(context).size.width * 40 / 100,

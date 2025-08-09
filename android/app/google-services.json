@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "552161871068",
+    "project_id": "new-nada-app",
+    "storage_bucket": "new-nada-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:552161871068:android:bd5957a8f9f6bd807fe019",
+        "android_client_info": {
+          "package_name": "com.axters.nada_dco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMlzfT0Tbf9WMlQunZv3-mwCoeWDBL8nY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
